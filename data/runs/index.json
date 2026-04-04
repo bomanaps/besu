@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "sha": "6bd6a4d1cbee23caa557de72dcb8be156fcfe745",
+    "ref": "main",
+    "date": "2026-04-04T18:20:19Z",
+    "run_id": "23981867801",
+    "benchmark_filter": "all",
+    "runner_os": "Linux",
+    "runner_arch": "X64",
+    "benchmark_count": 320
+  }
+]
