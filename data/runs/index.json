@@ -18,5 +18,15 @@
     "runner_os": "Linux",
     "runner_arch": "X64",
     "benchmark_count": 466
+  },
+  {
+    "sha": "a5f5b91abb9afbaaf03ccc6e7a9c319d90ea4229",
+    "ref": "feat/continuous-evm-benchmarking",
+    "date": "2026-05-20T21:18:32Z",
+    "run_id": "26178417796",
+    "benchmark_filter": "all",
+    "runner_os": "Linux",
+    "runner_arch": "X64",
+    "benchmark_count": 466
   }
 ]
