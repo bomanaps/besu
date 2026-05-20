@@ -3,20 +3,46 @@
 ## Unreleased
 
 ### Breaking Changes
+- RPC changes to enhance compatibility with other ELs
+  - Hash parameter in RPCs now only supports hex values. Hash values without a `0x` prefix are now rejected with `-32602 INVALID_PARAMS`. Affected RPCs including but not limited to: `debug_getRawTransaction`, `eth_getTransactionByHash`, `eth_getTransactionReceipt` [#10505](https://github.com/besu-eth/besu/pull/10505)
+  - Block number parameter in RPCs now only supports hex values. Non-hex (decimal) block number parameters are now rejected. Affected RPCs including but not limited to: `admin_logsRemoveCache`, `admin_generateLogBloomCache`, `eth_estimateGas`, `eth_getBlockByNumber`, `eth_getBlockTransactionCountByNumber`, `eth_getTransactionByBlockNumberAndIndex`, `eth_getUncleByBlockNumberAndIndex`, `eth_getUncleCountByBlockNumber`, `eth_feeHistory`, `trace_block`, `trace_call`, `trace_callMany`, `trace_replayBlockTransactions`, `debug_traceBlockByNumber`, `debug_traceCall`, and `debug_replayBlock` [#10515](https://github.com/besu-eth/besu/pull/10515), [#10240](https://github.com/besu-eth/besu/pull/10240)
 
 ### Upcoming Breaking Changes
+- Sunsetting features - for more context on the reasoning behind the deprecation of these features, including alternative options, read [this blog post](https://www.lfdecentralizedtrust.org/blog/sunsetting-tessera-and-simplifying-hyperledger-besu)
+  - Proof of Work consensus (PoW)
+- `--min-block-occupancy-ratio` is deprecated and will be removed in a future release
+- Plugin API
+  - `PluginTransactionSelectorFactory.create(final SelectorsStateManager selectorsStateManager)` is deprecated for removal
+- `--Xmax-tracked-seen-txs-per-peer` renamed to `--Xmax-tracked-seen-txs` (old name kept as deprecated alias will be removed in a future release)
+- Besu will require Java JDK 25 to build and run in a future release.
+- BFT option `xemptyblockperiodseconds` has been taken out of experimental and been renamed `emptyblockperiodseconds`. The old config option is deprecated and will be removed in a future release.
+- `--Xbft-legacy-protocol-encoding` will be removed once Besu 25.x is no longer supported. [#10499](https://github.com/besu-eth/besu/pull/10499)
 
 ### Bug fixes
-- `eth_getFilterLogs`: cache the chain head once when resolving default `latest..latest` bounds, so a block arriving between the two reads no longer expands the queried range into `[N, N+1]` and returns extra logs. [#10368](https://github.com/besu-eth/besu/pull/10368)
+- Fix `testing_buildBlockV1` to return correct `blockValue` (actual priority fees) and omit null `blockAccessList`/`slotNumber` fields from the response payload; same omission applies to `engine_getPayloadV6` (these fields are always populated for a V6 payload). [#10492](https://github.com/besu-eth/besu/pull/10492)
+- Fix `testing_buildBlockV1` to return error `-32000` when an explicitly provided transaction is not applicable (e.g. wrong nonce), instead of silently dropping it and returning a success response. [#10486](https://github.com/besu-eth/besu/pull/10486)
+- Fix `LayeredKeyValueStorage.isClosed()` repeatedly re-walking the full parent chain on every storage operation, causing CPU saturation under a stalled forkchoice head. The closed-state is now cached per layer after the first propagation. [#10508](https://github.com/besu-eth/besu/issues/10508)
+- Fix `engine_forkchoiceUpdatedV1` now returns `-38003 INVALID_PAYLOAD_ATTRIBUTES` for invalid payload attribute timestamps (zero or not greater than head). [#10353](https://github.com/besu-eth/besu/pull/10353)
+- Fix `engine_newPayloadV4`/`V5` now returns `-32602 INVALID_PARAMS` instead of `INVALID` payload status when execution requests contain an unknown request type. [#10484](https://github.com/besu-eth/besu/pull/10484)
+- Fix `debug_trace*` `storage` field to emit only for SLOAD/SSTORE opcodes showing the single slot touched, matching the execution-apis spec and geth behaviour [#10176](https://github.com/besu-eth/besu/pull/10176)
+- Fix blob transaction sidecar validation: detect missing sidecars, KZG commitment/versioned-hash mismatches, and type/size mismatches against eth/68 announcements; disconnect offending peers immediately [#10510](https://github.com/hyperledger/besu/pull/10510)
+- Fix `PeerTransactionTracker` incorrectly evicting peers that are connected but awaiting `ChainHeadTracker` validation, causing Besu to silently drop announced transactions from those peers [#10511](https://github.com/hyperledger/besu/pull/10511)
+- Fix `RLPException` observed during BFT (QBFT/IBFT2) rolling upgrades from Besu 25.x. Use the flag `--Xbft-legacy-protocol-encoding` on each upgrading Besu node to remain compatible with existing Besu 25.x nodes on the BFT network. [#10499](https://github.com/besu-eth/besu/pull/10499)
 
 ### Additions and Improvements
-- Add EIP-7981 to Amsterdam [#10388](https://github.com/besu-eth/besu/pull/10388)
+- Add `eth_baseFee` JSON-RPC method, returning the calculated base fee of the next block [#10457](https://github.com/besu-eth/besu/pull/10457)
+- Add `eth_getStorageValues` JSON-RPC method for batched reads of multiple storage slots across multiple accounts in a single call [#10259](https://github.com/besu-eth/besu/pull/10259)
+- Add `enableReturnData` parameter to `debug_traceTransaction` and `debug_traceBlockByNumber`, and include `returnData` in `StructLog` when captured; the field is omitted when return data is empty or not captured. [#10172](https://github.com/besu-eth/besu/pull/10172)
+- Updated `Bouncycastle` to 1.84 and `maven-artifact` to 3.9.15 to resolve CVEs reported in those libraries. Besu's usage patterns are not affected by these vulnerabilities. [#10420](https://github.com/besu-eth/besu/pull/10420)
+- Improve native memory handling in RocksDB storage: `LRUCache`, `ColumnFamilyOptions`, and temporary options-file loading objects are now explicitly closed [#10456](https://github.com/besu-eth/besu/pull/10456)
+- `eth_capabilities`: `state` and `stateproofs` now report `disabled: true` when genesis world state is unavailable (e.g. SNAP sync nodes) [#10377](https://github.com/besu-eth/besu/pull/10377)
 
 ## 26.5.0
 
 ### Breaking Changes
 - Plugin API
   - Removed `BesuConfiguration#getRpcHttpHost()` and `BesuConfiguration#getRpcHttpPort()` which have been deprecated since `25.1.0`. Use `getConfiguredRpcHttpHost()` and `getConfiguredRpcHttpPort()` instead. [#10268](https://github.com/besu-eth/besu/pull/10268)
+- Experimental Bonsai Archive column families have changed removing freezer column families. If you are using the Bonsai archive you will need to do a full resync [#10339](https://github.com/besu-eth/besu/pull/10339)
 
 ### Upcoming Breaking Changes
 - RPC changes to enhance compatibility with other ELs
@@ -32,8 +58,10 @@
 - BFT option `xemptyblockperiodseconds` has been taken out of experimental and been renamed `emptyblockperiodseconds`. The old config option is deprecated and will be removed in a future release.
 
 ### Bug fixes
+- Fix `eth_getBlockByNumber`/`eth_getBlockByHash` returning EIP-7928 block access list hash under key `balHash` instead of `blockAccessListHash`, breaking tooling that uses go-ethereum's `types.Header` struct [#10359](https://github.com/besu-eth/besu/issues/10359)
 - `engine_newPayloadV3`/V4/V5: validate parameters before fork-support check so that missing required fields return `-32602` (`INVALID_PARAMS`) instead of `-38005` (`UNSUPPORTED_FORK`), matching the Engine API spec [#10249](https://github.com/besu-eth/besu/pull/10249)
 - Fix data race in `SyncDurationMetrics` where the backing `HashMap` was mutated from multiple sync threads in parallel, causing missing or zero `sync_duration` samples. [#10277](https://github.com/besu-eth/besu/pull/10277)
+- Fix chain pruning race that could lose fork block metadata updates when concurrent same-height block events are recorded. [#10331](https://github.com/besu-eth/besu/pull/10331)
 - Fix CVE-2026-34480 and CVE-2026-34478 in log4j [#10332](https://github.com/besu-eth/besu/pull/10332)
 - Reject Status messages whose declared `protocolVersion` field disagrees with the on-wire layout (eth/68 vs eth/69+). The decoder now throws `RLPException` directly so the peer is cleanly disconnected with `SUBPROTOCOL_TRIGGERED_UNPARSABLE_STATUS`. [#10241](https://github.com/besu-eth/besu/pull/10241)
 - Fix `updateForkChoice` ignoring `setNewHead` failure: when world state cannot be rolled to the target block, return `INVALID` to the CL instead of silently returning `VALID` with inconsistent finalized/safe state. [#10224](https://github.com/besu-eth/besu/pull/10224)
@@ -42,6 +70,7 @@
 - Cleanly stop backward sync if world state is unavailable [#10021](https://github.com/besu-eth/besu/pull/10021)
 - Enforce that `blob_versioned_hashes` match the supplied blobs [#10278](https://github.com/besu-eth/besu/pull/10278)
 - Restrict no-reorg behavior to the prefix of the known finalized chain (per execution-apis #786) [#10335](https://github.com/besu-eth/besu/pull/10335)
+- `eth_getFilterLogs`: cache the chain head once when resolving default `latest..latest` bounds, so a block arriving between the two reads no longer expands the queried range into `[N, N+1]` and returns extra logs. [#10368](https://github.com/besu-eth/besu/pull/10368)
 
 ### Additions and Improvements
 - The option to set a different block period for empty BFT blocks (`emptyblockperiodseconds`) is no longer experimental. The experimental flag `xemptyblockperiodseconds` will be removed in a future release. [#10264](https://github.com/besu-eth/besu/pull/10264)
@@ -58,6 +87,11 @@
 - Enforce EIP-7928 Block Access List item budget per transaction in both processing and mining [#10250](https://github.com/besu-eth/besu/pull/10250)
 - Include `slotNumber` in `payloadIdentifier` generation [#10242](https://github.com/besu-eth/besu/pull/10242)
 - Change Block Access List index encoding to `uint32` [#10279](https://github.com/besu-eth/besu/pull/10279)
+- Add `limit` support to debug opcode tracing to stop capture after N EVM steps (`0` keeps the previous unlimited behavior) and reject negative values at the RPC parameter boundary [#10173](https://github.com/besu-eth/besu/pull/10173)
+- Add EIP-7981 to Amsterdam [#10388](https://github.com/besu-eth/besu/pull/10388)
+- Bonsai Archive storage now uses Bonsai for head and Bonsai for near head improving performance for head queries [#10192](https://github.com/besu-eth/besu/pull/10192)
+- Added `eth_capabilities` JSON-RPC method that returns the node's data-serving capabilities, including chain head and per-resource availability flags [#10322](https://github.com/besu-eth/besu/pull/10322)
+- Upgrade execution-spec-tests to v5.4.0 and fix test harness to correctly handle blocks with expected exceptions [#10287](https://github.com/besu-eth/besu/issues/10287)
 
 ### Plugin API
 - Publish Guava as an API dependency from `plugin-api` [#10248](https://github.com/besu-eth/besu/pull/10248)
@@ -103,6 +137,7 @@ are provided with different values, using input as per the execution-apis spec i
 - Fix eth_simulateV1 returning wrong error code when transaction gas exceeds block gas limit: now correctly returns -38015 (BLOCK_GAS_LIMIT_EXCEEDED) instead of -38014 or succeeding [#10073](https://github.com/besu-eth/besu/pull/10073)
 - Wait for peers before starting chain download. Prevents an OutOfMemory (OOM) error when the node has zero peers [#9979](https://github.com/hyperledger/besu/pull/9979)
 - Upgrade besu-native libraries version to 1.5.0. This fixes the issue of besu-native/secp256r1 exporting OpenSSL symbols in JVM space. [besu-native #308](https://github.com/besu-eth/besu-native/pull/308)
+- Fix QBFT `xemptyblockperiodseconds` not working when transactions arrive before the timer expires, causing unnecessary delay in block production [#10153](https://github.com/besu-eth/besu/pull/10153)
 
 ### Additions and Improvements
 - Add `transactionReceipts` subscription type to `eth_subscribe` that pushes all transaction receipts when a new block is added, with optional `transactionHashes` filter to receive receipts for specific transactions only [#10190](https://github.com/besu-eth/besu/pull/10190)
@@ -118,6 +153,7 @@ are provided with different values, using input as per the execution-apis spec i
 - Limit pooled tx requests by size and remove pre-eth/68 transaction announcement support [#9990](https://github.com/besu-eth/besu/pull/9990)
 - Reduce tx p2p broadcast bandwidth and memory used [#9937](https://github.com/besu-eth/besu/pull/9937) 
 - Improve syncing time of the experimental Bonsai Archive storage by migrating after a Bonsai full sync [#9979](https://github.com/besu-eth/besu/pull/9997)
+- Add `selectedTxsEvaluation` metric to block creation timing log [#9179](https://github.com/besu-eth/besu/issues/9179)
 - Layered txpool: enable balance check by default [#10175](https://github.com/besu-eth/besu/pull/10175)
 
 ### Plugin API
