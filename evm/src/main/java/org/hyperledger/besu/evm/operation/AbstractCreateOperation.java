@@ -82,12 +82,24 @@ public abstract class AbstractCreateOperation extends AbstractOperation {
     if (frame.getRemainingGas() < cost) {
       return new OperationResult(cost, ExceptionalHaltReason.INSUFFICIENT_GAS);
     }
+
+    // EIP-3860: the initcode-size limit is an early exceptional abort, so it must be
+    // evaluated against the stack-declared size before initcode is resolved from
+    // memory (which would expand memory based on an unvalidated length) and before
+    // state gas is charged below.
+    if (getInputSize(frame) > evm.getMaxInitcodeSize()) {
+      frame.popStackItems(getStackItemsConsumed());
+      return new OperationResult(cost, ExceptionalHaltReason.CODE_TOO_LARGE);
+    }
+
     final Wei value = Wei.wrap(frame.getStackItem(0));
 
     final Address address = frame.getRecipientAddress();
     final MutableAccount account = getMutableAccount(address, frame);
 
     frame.clearReturnData();
+
+    final Code code = codeSupplier.get();
 
     // EIP-8037: Deduct regular gas before charging state gas (ordering requirement).
     frame.decrementRemainingGas(cost);
@@ -99,15 +111,6 @@ public abstract class AbstractCreateOperation extends AbstractOperation {
 
     // Add regular gas back — the EVM loop will deduct it via the OperationResult.
     frame.incrementRemainingGas(cost);
-
-    // Resolve initcode after state gas charge to avoid unnecessary work (e.g. memory read,
-    // Code object creation) on paths where state gas is insufficient.
-    final Code code = codeSupplier.get();
-
-    if (code != null && code.getSize() > evm.getMaxInitcodeSize()) {
-      frame.popStackItems(getStackItemsConsumed());
-      return new OperationResult(cost, ExceptionalHaltReason.CODE_TOO_LARGE);
-    }
 
     final boolean insufficientBalance = value.compareTo(account.getBalance()) > 0;
     final boolean maxDepthReached = frame.getDepth() >= 1024;
@@ -167,6 +170,17 @@ public abstract class AbstractCreateOperation extends AbstractOperation {
    * @return the initcode, raw bytes, unparsed and unvalidated
    */
   protected abstract Code getInitCode(MessageFrame frame, EVM evm);
+
+  /**
+   * Returns the declared initcode size from the stack, clamped to a long. Used for the EIP-3860
+   * size check before initcode is resolved from memory.
+   *
+   * @param frame the message frame the operation executed in
+   * @return the requested initcode size
+   */
+  protected long getInputSize(final MessageFrame frame) {
+    return clampedToLong(frame.getStackItem(2));
+  }
 
   /**
    * Handles stack items when operation fails for validation reasons (noe enough ether, bad eof

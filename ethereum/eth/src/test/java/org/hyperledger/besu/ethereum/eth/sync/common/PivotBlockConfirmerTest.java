@@ -32,6 +32,7 @@ import org.hyperledger.besu.ethereum.eth.manager.peertask.PeerTaskExecutorRespon
 import org.hyperledger.besu.ethereum.eth.manager.peertask.PeerTaskExecutorResult;
 import org.hyperledger.besu.ethereum.eth.manager.peertask.task.GetHeadersFromPeerTask;
 import org.hyperledger.besu.ethereum.eth.sync.common.PivotBlockConfirmer.ContestedPivotBlockException;
+import org.hyperledger.besu.ethereum.eth.sync.snapsync.SnapSyncProcessState;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPool;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 import org.hyperledger.besu.plugin.services.storage.DataStorageFormat;
@@ -45,7 +46,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import org.apache.tuweni.bytes.Bytes;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -129,12 +129,12 @@ public class PivotBlockConfirmerTest {
                 List.of(respondingPeerB.getEthPeer())));
 
     // Execute task
-    final CompletableFuture<PivotSyncState> future = pivotBlockConfirmer.confirmPivotBlock();
+    final CompletableFuture<SnapSyncProcessState> future = pivotBlockConfirmer.confirmPivotBlock();
 
     future.join();
     assertThat(future)
         .isCompletedWithValue(
-            new PivotSyncState(blockchain.getBlockHeader(PIVOT_BLOCK_NUMBER).get(), false));
+            new SnapSyncProcessState(blockchain.getBlockHeader(PIVOT_BLOCK_NUMBER).get(), false));
   }
 
   @ParameterizedTest
@@ -168,11 +168,11 @@ public class PivotBlockConfirmerTest {
                 List.of(peerC.getEthPeer())));
 
     // Execute task
-    final CompletableFuture<PivotSyncState> future = pivotBlockConfirmer.confirmPivotBlock();
+    final CompletableFuture<SnapSyncProcessState> future = pivotBlockConfirmer.confirmPivotBlock();
 
     assertThat(future)
         .isCompletedWithValue(
-            new PivotSyncState(blockchain.getBlockHeader(PIVOT_BLOCK_NUMBER).get(), false));
+            new SnapSyncProcessState(blockchain.getBlockHeader(PIVOT_BLOCK_NUMBER).get(), false));
   }
 
   @ParameterizedTest
@@ -212,16 +212,9 @@ public class PivotBlockConfirmerTest {
                 List.of(respondingPeerB.getEthPeer())));
 
     // Execute task and wait for response
-    final CompletableFuture<PivotSyncState> future = pivotBlockConfirmer.confirmPivotBlock();
+    final CompletableFuture<SnapSyncProcessState> future = pivotBlockConfirmer.confirmPivotBlock();
 
     assertThat(future).isCompletedExceptionally();
     assertThatThrownBy(future::get).hasRootCauseInstanceOf(ContestedPivotBlockException.class);
-  }
-
-  @Test
-  void dryRunDetector() {
-    assertThat(true)
-        .withFailMessage("This test is here so gradle --dry-run executes this class")
-        .isTrue();
   }
 }

@@ -55,7 +55,8 @@ public class ParallelTransactionPreprocessing implements PreprocessingFunction {
       final BlockHashLookup blockHashLookup,
       final Wei blobGasPrice,
       final Optional<BlockAccessListBuilder> blockAccessListBuilder,
-      final Optional<BlockAccessList> maybeBlockBal) {
+      final Optional<BlockAccessList> maybeBlockBal,
+      final Optional<BlockHeader> maybeParentHeader) {
     if (!(protocolContext.getWorldStateArchive() instanceof PathBasedWorldStateProvider)) {
       return Optional.empty();
     }
@@ -64,10 +65,9 @@ public class ParallelTransactionPreprocessing implements PreprocessingFunction {
 
     if (balConfiguration.isPerfectParallelizationEnabled() && maybeBlockBal.isPresent()) {
       parallelProcessor =
-          new BalConcurrentTransactionProcessor(
-              transactionProcessor, maybeBlockBal.get(), balConfiguration);
+          new BalConcurrentTransactionProcessor(transactionProcessor, maybeBlockBal.get());
     } else {
-      parallelProcessor = new ParallelizedConcurrentTransactionProcessor(transactionProcessor);
+      parallelProcessor = new OptimisticConcurrentTransactionProcessor(transactionProcessor);
     }
 
     parallelProcessor.runAsyncBlock(
@@ -78,7 +78,8 @@ public class ParallelTransactionPreprocessing implements PreprocessingFunction {
         blockHashLookup,
         blobGasPrice,
         executor,
-        blockAccessListBuilder);
+        blockAccessListBuilder,
+        maybeParentHeader);
 
     return Optional.of(new PreprocessingContext(parallelProcessor));
   }

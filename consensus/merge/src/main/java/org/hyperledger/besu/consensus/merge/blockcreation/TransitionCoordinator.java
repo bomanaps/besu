@@ -21,20 +21,16 @@ import org.hyperledger.besu.datatypes.Hash;
 import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.ethereum.BlockProcessingResult;
 import org.hyperledger.besu.ethereum.blockcreation.MiningCoordinator;
-import org.hyperledger.besu.ethereum.blockcreation.PoWMiningCoordinator;
-import org.hyperledger.besu.ethereum.chain.PoWObserver;
 import org.hyperledger.besu.ethereum.core.Block;
 import org.hyperledger.besu.ethereum.core.BlockHeader;
 import org.hyperledger.besu.ethereum.core.Transaction;
-import org.hyperledger.besu.ethereum.core.Withdrawal;
 import org.hyperledger.besu.ethereum.eth.manager.EthScheduler;
 import org.hyperledger.besu.ethereum.mainnet.block.access.list.BlockAccessList;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
-
-import org.apache.tuweni.bytes.Bytes32;
 
 /** The Transition coordinator. */
 public class TransitionCoordinator extends TransitionUtils<MiningCoordinator>
@@ -132,35 +128,14 @@ public class TransitionCoordinator extends TransitionUtils<MiningCoordinator>
   }
 
   @Override
-  public void addEthHashObserver(final PoWObserver observer) {
-    if (this.miningCoordinator instanceof PoWMiningCoordinator) {
-      miningCoordinator.addEthHashObserver(observer);
-    }
-  }
-
-  @Override
   public void changeTargetGasLimit(final Long targetGasLimit) {
     miningCoordinator.changeTargetGasLimit(targetGasLimit);
     mergeCoordinator.changeTargetGasLimit(targetGasLimit);
   }
 
   @Override
-  public PayloadIdentifier preparePayload(
-      final BlockHeader parentHeader,
-      final Long timestamp,
-      final Bytes32 prevRandao,
-      final Address feeRecipient,
-      final Optional<List<Withdrawal>> withdrawals,
-      final Optional<Bytes32> parentBeaconBlockRoot,
-      final Optional<Long> slotNumber) {
-    return mergeCoordinator.preparePayload(
-        parentHeader,
-        timestamp,
-        prevRandao,
-        feeRecipient,
-        withdrawals,
-        parentBeaconBlockRoot,
-        slotNumber);
+  public PayloadIdentifier preparePayload(final PreparePayloadArgs preparePayloadArgs) {
+    return mergeCoordinator.preparePayload(preparePayloadArgs);
   }
 
   @Override
@@ -183,6 +158,23 @@ public class TransitionCoordinator extends TransitionUtils<MiningCoordinator>
   public ForkchoiceResult updateForkChoice(
       final BlockHeader newHead, final Hash finalizedBlockHash, final Hash safeBlockHash) {
     return mergeCoordinator.updateForkChoice(newHead, finalizedBlockHash, safeBlockHash);
+  }
+
+  @Override
+  public ForkchoiceResult updateForkChoiceWithoutLegacySkip(
+      final BlockHeader newHead, final Hash finalizedBlockHash, final Hash safeBlockHash) {
+    return mergeCoordinator.updateForkChoiceWithoutLegacySkip(
+        newHead, finalizedBlockHash, safeBlockHash);
+  }
+
+  @Override
+  public boolean isAncestorOfFinalized(final Hash candidateHeadHash) {
+    return mergeCoordinator.isAncestorOfFinalized(candidateHeadHash);
+  }
+
+  @Override
+  public OptionalLong computeReorgDepth(final BlockHeader newHead) {
+    return mergeCoordinator.computeReorgDepth(newHead);
   }
 
   @Override

@@ -31,7 +31,6 @@ import org.hyperledger.besu.ethereum.core.BlockHeaderFunctions;
 import org.hyperledger.besu.ethereum.core.ConsensusContextFixture;
 import org.hyperledger.besu.ethereum.core.Difficulty;
 import org.hyperledger.besu.ethereum.core.InMemoryKeyValueStorageProvider;
-import org.hyperledger.besu.ethereum.core.MutableWorldState;
 import org.hyperledger.besu.ethereum.core.ParsedExtraData;
 import org.hyperledger.besu.ethereum.core.Transaction;
 import org.hyperledger.besu.ethereum.core.Withdrawal;
@@ -39,10 +38,10 @@ import org.hyperledger.besu.ethereum.mainnet.MainnetBlockHeaderFunctions;
 import org.hyperledger.besu.ethereum.mainnet.block.access.list.BlockAccessList;
 import org.hyperledger.besu.ethereum.rlp.BytesValueRLPInput;
 import org.hyperledger.besu.ethereum.rlp.RLPInput;
-import org.hyperledger.besu.ethereum.trie.pathbased.bonsai.BonsaiWorldStateProvider;
-import org.hyperledger.besu.ethereum.trie.pathbased.bonsai.cache.CodeCache;
-import org.hyperledger.besu.ethereum.trie.pathbased.bonsai.cache.NoopBonsaiCachedMerkleTrieLoader;
+import org.hyperledger.besu.ethereum.trie.pathbased.bonsai.provider.BonsaiWorldStateProvider;
 import org.hyperledger.besu.ethereum.trie.pathbased.bonsai.storage.BonsaiWorldStateKeyValueStorage;
+import org.hyperledger.besu.ethereum.trie.pathbased.bonsai.worldview.accumulator.preload.NoOpBonsaiCachedMerkleTrieLoader;
+import org.hyperledger.besu.ethereum.trie.pathbased.common.code.PathBasedCodeCache;
 import org.hyperledger.besu.ethereum.worldstate.DataStorageConfiguration;
 import org.hyperledger.besu.ethereum.worldstate.ImmutablePathBasedExtraStorageConfiguration;
 import org.hyperledger.besu.ethereum.worldstate.WorldStateArchive;
@@ -50,6 +49,7 @@ import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.hyperledger.besu.evm.worldstate.WorldUpdater;
 import org.hyperledger.besu.plugin.ServiceManager;
 import org.hyperledger.besu.plugin.services.BesuService;
+import org.hyperledger.besu.plugin.services.worldstate.MutableWorldState;
 
 import java.util.List;
 import java.util.Map;
@@ -79,20 +79,21 @@ public class BlockchainReferenceTestCaseSpec {
   private final String sealEngine;
 
   private WorldStateArchive buildWorldStateArchive(
-      final long cacheSize, final Blockchain blockchain) {
+      final DataStorageConfiguration storageConfiguration,
+      final long cacheSize,
+      final Blockchain blockchain) {
 
     final InMemoryKeyValueStorageProvider inMemoryKeyValueStorageProvider =
         new InMemoryKeyValueStorageProvider();
     final WorldStateArchive worldStateArchive =
         new BonsaiWorldStateProvider(
             (BonsaiWorldStateKeyValueStorage)
-                inMemoryKeyValueStorageProvider.createWorldStateStorage(
-                    DataStorageConfiguration.DEFAULT_BONSAI_CONFIG),
+                inMemoryKeyValueStorageProvider.createWorldStateStorage(storageConfiguration),
             blockchain,
-            ImmutablePathBasedExtraStorageConfiguration.builder()
-                .maxLayersToLoad(cacheSize)
-                .build(),
-            new NoopBonsaiCachedMerkleTrieLoader(),
+            ImmutablePathBasedExtraStorageConfiguration.copyOf(
+                    storageConfiguration.getPathBasedExtraStorageConfiguration())
+                .withMaxLayersToLoad(cacheSize),
+            new NoOpBonsaiCachedMerkleTrieLoader(),
             new ServiceManager() {
               @Override
               public <T extends BesuService> void addService(
@@ -105,7 +106,7 @@ public class BlockchainReferenceTestCaseSpec {
             },
             EvmConfiguration.DEFAULT,
             () -> (__, ___) -> {},
-            new CodeCache());
+            new PathBasedCodeCache());
 
     final MutableWorldState worldState = worldStateArchive.getWorldState();
     final WorldUpdater updater = worldState.updater();
@@ -156,11 +157,13 @@ public class BlockchainReferenceTestCaseSpec {
     return genesisBlockHeader;
   }
 
-  public ProtocolContext buildProtocolContext(final MutableBlockchain blockchain) {
+  public ProtocolContext buildProtocolContext(
+      final DataStorageConfiguration storageConfiguration, final MutableBlockchain blockchain) {
     return new ProtocolContext.Builder()
         .withBlockchain(blockchain)
         .withWorldStateArchive(
             buildWorldStateArchive(
+                storageConfiguration,
                 Stream.of(candidateBlocks).filter(CandidateBlock::isExecutable).count(),
                 blockchain))
         .withConsensusContext(new ConsensusContextFixture())
@@ -302,6 +305,10 @@ public class BlockchainReferenceTestCaseSpec {
           && transactions == null
           && uncleHeaders == null
           && withdrawals == null) {
+        blockValid = false;
+      }
+
+      if (expectException != null || expectExceptionALL != null) {
         blockValid = false;
       }
 

@@ -82,6 +82,44 @@ public class WebSocketMessageHandler {
     } else {
       try {
         final JsonObject jsonRpcRequest = buffer.toJsonObject();
+
+        if (jsonRpcExecutor.isStreamingMethod(jsonRpcRequest.getString("method"))) {
+          vertx
+              .<Void>executeBlocking(
+                  promise -> {
+                    try (JsonResponseStreamer streamer = new JsonResponseStreamer(websocket)) {
+                      jsonRpcExecutor.executeStreaming(
+                          user,
+                          null,
+                          null,
+                          new IsAliveHandler(ethScheduler, timeoutSec),
+                          jsonRpcRequest,
+                          req -> {
+                            final WebSocketRpcRequest websocketRequest =
+                                req.mapTo(WebSocketRpcRequest.class);
+                            websocketRequest.setConnectionId(websocket.textHandlerID());
+                            return websocketRequest;
+                          },
+                          streamer,
+                          jsonObjectMapper);
+                      promise.complete();
+                    } catch (IOException e) {
+                      promise.fail(e);
+                    }
+                  })
+              .onFailure(
+                  throwable -> {
+                    LOG.error("Error streaming JSON-RPC response", throwable);
+                    try {
+                      final Integer id = jsonRpcRequest.getInteger("id", null);
+                      replyToClient(websocket, errorResponse(id, RpcErrorType.INTERNAL_ERROR));
+                    } catch (ClassCastException idNotIntegerException) {
+                      replyToClient(websocket, errorResponse(null, RpcErrorType.INTERNAL_ERROR));
+                    }
+                  });
+          return;
+        }
+
         vertx
             .<JsonRpcResponse>executeBlocking(
                 promise -> {
@@ -166,13 +204,21 @@ public class WebSocketMessageHandler {
   }
 
   private void replyToClient(final ServerWebSocket websocket, final Object result) {
-    traceResponse(result);
-    try {
-      // underlying output stream lifecycle is managed by the json object writer
-      JSON_OBJECT_WRITER.writeValue(new JsonResponseStreamer(websocket), result);
-    } catch (IOException ex) {
-      LOG.error("Error streaming JSON-RPC response", ex);
-    }
+    vertx
+        .<Void>executeBlocking(
+            promise -> {
+              try {
+                traceResponse(result);
+                // JsonResponseStreamer may block while waiting for the websocket write queue to
+                // drain, so keep the full response serialization path off the event loop.
+                JSON_OBJECT_WRITER.writeValue(new JsonResponseStreamer(websocket), result);
+                promise.complete();
+              } catch (IOException ex) {
+                promise.fail(ex);
+              }
+            },
+            false)
+        .onFailure(ex -> LOG.error("Error streaming JSON-RPC response", ex));
   }
 
   private JsonRpcResponse errorResponse(final Object id, final RpcErrorType error) {

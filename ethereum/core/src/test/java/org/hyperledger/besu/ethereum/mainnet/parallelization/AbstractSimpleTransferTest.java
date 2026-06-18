@@ -30,7 +30,7 @@ import static org.hyperledger.besu.ethereum.mainnet.parallelization.ParallelBloc
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.ethereum.core.Transaction;
-import org.hyperledger.besu.ethereum.trie.pathbased.bonsai.BonsaiAccount;
+import org.hyperledger.besu.ethereum.trie.pathbased.bonsai.account.BonsaiAccount;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +50,35 @@ public abstract class AbstractSimpleTransferTest
             0, 2_000_000_000_000_000_000L, 300_000L, 0L, 5L, ACCOUNT_3, ACCOUNT_GENESIS_2_KEYPAIR);
 
     final ComparisonResult result = executeAndCompare(Wei.of(5), tx1, tx2);
+
+    final Address addr2 = Address.fromHexStringStrict(ACCOUNT_2);
+    final Address addr3 = Address.fromHexStringStrict(ACCOUNT_3);
+    final Address sender1 = Address.fromHexStringStrict(ACCOUNT_GENESIS_1);
+    final Address sender2 = Address.fromHexStringStrict(ACCOUNT_GENESIS_2);
+
+    assertAccountsMatch(result.seqWorldState(), result.parWorldState(), addr2);
+    assertAccountsMatch(result.seqWorldState(), result.parWorldState(), addr3);
+    assertAccountsMatch(result.seqWorldState(), result.parWorldState(), sender1);
+    assertAccountsMatch(result.seqWorldState(), result.parWorldState(), sender2);
+
+    assertThat(((BonsaiAccount) result.seqWorldState().get(addr2)).getBalance())
+        .isEqualTo(Wei.of(1_000_000_000_000_000_000L));
+    assertThat(((BonsaiAccount) result.seqWorldState().get(addr3)).getBalance())
+        .isEqualTo(Wei.of(2_000_000_000_000_000_000L));
+  }
+
+  @Test
+  @DisplayName(
+      "Independent transfers from different senders match when parent is chain head minus one")
+  void independentTransfersWithParentAtHeadMinusOne() {
+    final Transaction tx1 =
+        createTransferTransaction(
+            0, 1_000_000_000_000_000_000L, 300_000L, 0L, 5L, ACCOUNT_2, ACCOUNT_GENESIS_1_KEYPAIR);
+    final Transaction tx2 =
+        createTransferTransaction(
+            0, 2_000_000_000_000_000_000L, 300_000L, 0L, 5L, ACCOUNT_3, ACCOUNT_GENESIS_2_KEYPAIR);
+
+    final ComparisonResult result = executeAndCompareParentOfChainHead(Wei.of(5), tx1, tx2);
 
     final Address addr2 = Address.fromHexStringStrict(ACCOUNT_2);
     final Address addr3 = Address.fromHexStringStrict(ACCOUNT_3);
