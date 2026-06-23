@@ -157,11 +157,12 @@ def classify(baseline_entry: dict, current_entry: dict, threshold: float) -> tup
     # Confidence interval overlap check.
     # Baseline CI:  [b_score - b_error, b_score + b_error]
     # Current CI:   [c_score - c_error, c_score + c_error]
-    # Intervals overlap when the lower bound of the higher one is below the
-    # upper bound of the lower one.
+    # Two intervals [a, b] and [c, d] overlap iff c <= b AND a <= d.
+    baseline_lo = b_score - b_error
     baseline_hi = b_score + b_error
     current_lo  = c_score - c_error
-    intervals_overlap = current_lo < baseline_hi
+    current_hi  = c_score + c_error
+    intervals_overlap = current_lo <= baseline_hi and baseline_lo <= current_hi
 
     if intervals_overlap:
         return change_pct, STATUS_NOISY
