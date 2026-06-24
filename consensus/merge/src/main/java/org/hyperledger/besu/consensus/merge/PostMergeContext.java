@@ -130,13 +130,10 @@ public class PostMergeContext implements MergeContext {
     if (state == null) {
       return true;
     }
-    // Pre-TTD: if terminal difficulty hasn't been reached we're still in PoW sync.
-    if (!state.hasReachedTerminalDifficulty().orElse(false)) {
+    final Optional<Boolean> ttdReached = state.hasReachedTerminalDifficulty();
+    if (ttdReached.isPresent() && !ttdReached.get()) {
       return true;
     }
-    // Post-TTD (post-merge): rely solely on peer sync state. This correctly handles full sync on
-    // post-merge networks where reachedTerminalDifficulty is always true, which previously caused
-    // this method to always return false even while the node was actively downloading the chain.
     return !state.isInSync();
   }
 

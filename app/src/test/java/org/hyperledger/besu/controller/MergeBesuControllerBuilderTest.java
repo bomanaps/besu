@@ -261,6 +261,21 @@ public class MergeBesuControllerBuilderTest {
   }
 
   @Test
+  public void p2pEnabledFalseWithNonFullSyncReportsNotSyncing() {
+    when(synchronizerConfiguration.getSyncMode()).thenReturn(SyncMode.SNAP);
+
+    final boolean isSyncing =
+        visitWithMockConfigs(new MergeBesuControllerBuilder())
+            .p2pEnabled(false)
+            .build()
+            .getProtocolContext()
+            .getConsensusContext(MergeContext.class)
+            .isSyncing();
+
+    assertThat(isSyncing).isFalse();
+  }
+
+  @Test
   public void assertConfiguredBlock() {
     final Blockchain mockChain = mock(Blockchain.class);
     when(mockChain.getBlockHeader(anyLong())).thenReturn(Optional.of(mock(BlockHeader.class)));
