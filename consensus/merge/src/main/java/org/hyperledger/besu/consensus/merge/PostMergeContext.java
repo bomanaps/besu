@@ -130,8 +130,7 @@ public class PostMergeContext implements MergeContext {
     if (state == null) {
       return true;
     }
-    final Optional<Boolean> ttdReached = state.hasReachedTerminalDifficulty();
-    if (ttdReached.isPresent() && !ttdReached.get()) {
+    if (!state.hasReachedTerminalDifficulty().orElse(false)) {
       return true;
     }
     return !state.isInSync();

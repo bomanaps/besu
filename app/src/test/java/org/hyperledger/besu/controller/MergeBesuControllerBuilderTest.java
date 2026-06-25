@@ -276,6 +276,32 @@ public class MergeBesuControllerBuilderTest {
   }
 
   @Test
+  public void p2pEnabledFalseMarksTerminalDifficultyReachedAtStartup() {
+    when(synchronizerConfiguration.getSyncMode()).thenReturn(SyncMode.SNAP);
+
+    final Optional<Boolean> ttdReached =
+        visitWithMockConfigs(new MergeBesuControllerBuilder())
+            .p2pEnabled(false)
+            .build()
+            .getSyncState()
+            .hasReachedTerminalDifficulty();
+
+    assertThat(ttdReached).contains(true);
+  }
+
+  @Test
+  public void p2pEnabledTrueLeavesTerminalDifficultyUnreached() {
+    final Optional<Boolean> ttdReached =
+        visitWithMockConfigs(new MergeBesuControllerBuilder())
+            .p2pEnabled(true)
+            .build()
+            .getSyncState()
+            .hasReachedTerminalDifficulty();
+
+    assertThat(ttdReached).isNotPresent();
+  }
+
+  @Test
   public void assertConfiguredBlock() {
     final Blockchain mockChain = mock(Blockchain.class);
     when(mockChain.getBlockHeader(anyLong())).thenReturn(Optional.of(mock(BlockHeader.class)));
