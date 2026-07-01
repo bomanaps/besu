@@ -156,7 +156,7 @@ async function renderLatestRun() {
       const cs = entry._score;
       const ce = entry._error;
       const delta = (cs - bs) / bs * 100;
-      const overlap = (cs - ce) < (bs + be);
+      const overlap = (cs - ce) <= (bs + be) && (bs - be) <= (cs + ce);
       entry._delta  = delta;
       entry._noisy  = overlap;
       entry._hasPrev = true;
